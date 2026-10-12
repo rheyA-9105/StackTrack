@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StockTrack — Choose Portal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="login-page portal-login-page">
+  <div class="bg-mesh"></div>
+  <div class="portal-login-layout">
+    <div class="login-card" style="align-items:center;">
+      <div class="login-header">
+        <div class="brand-logo" id="logoSlot"></div>
+        <div>
+          <p class="login-title">StockTrack</p>
+          <p class="login-subtitle">Inventory Management System</p>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:14px; width:100%;">
+        <a href="staff-login.html" class="btn-primary" style="display:flex; align-items:center; justify-content:center; text-decoration:none;">
+          Login
+        </a>
+      </div>
+
+      <p class="demo-hint">
+        <b>Demo accounts</b><br/>
+        Administrator: admin / admin123<br/>
+        Staff: staff1 / staff123
+      </p>
+    </div>
+    <section class="portal-intro">
+      <p class="portal-intro-kicker">A clearer view of your inventory</p>
+      <h1>Keep every item moving in the right direction.</h1>
+      <p>StockTrack helps teams monitor products, stock levels, suppliers, and inventory activity from one dependable place.</p>
+    </section>
+  </div>
+  <div class="footer-note">
+    <p>© 2026 StockTrack Inc. All rights reserved.</p>
+    <p>Version 2.4.0 (Enterprise Build)</p>
+  </div>
+</div>
+
+<script src="js/icons.js"></script>
+<script>
+  document.getElementById('logoSlot').innerHTML = ICONS.logo.replace('currentColor','#2563eb');
+</script>
+</body>
+</html>
