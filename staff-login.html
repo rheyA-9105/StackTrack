@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StockTrack — Staff Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="login-page">
+  <div class="bg-mesh"></div>
+
+  <div class="login-card">
+    <div class="login-header">
+      <div class="brand-logo" id="logoSlot"></div>
+      <div>
+        <p class="login-title">StockTrack</p>
+        <p class="login-subtitle">Inventory Management System</p>
+      </div>
+      <span class="portal-badge" id="shieldSlot">Staff Portal</span>
+    </div>
+
+    <form id="loginForm" style="display:flex; flex-direction:column; gap:20px; width:100%;">
+      <div id="errorBox" style="display:none;" class="error-msg"></div>
+
+      <div class="form-group">
+        <label class="form-label" for="username">Username or Email</label>
+        <div class="input-box">
+          <span id="userIcon"></span>
+          <input type="text" id="username" placeholder="e.g. staff1 or admin" autocomplete="username" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <div class="input-box">
+          <span id="lockIcon"></span>
+          <input type="password" id="password" placeholder="••••••••••••" autocomplete="current-password" required />
+          <button type="button" class="toggle-eye" id="toggleEye"></button>
+        </div>
+      </div>
+
+      <div class="form-helpers">
+        <label class="remember-me">
+          <input type="checkbox" id="remember" checked />
+          Remember Me
+        </label>
+        <button type="button" class="link-btn" id="forgotBtn">Forgot Password?</button>
+      </div>
+
+      <button type="submit" class="btn-primary">Login to System</button>
+
+      <p class="demo-hint">Demo: <b>admin</b>/admin123 or <b>staff1</b>/staff123</p>
+    </form>
+  </div>
+
+  <div class="footer-note">
+    <p>© 2026 StockTrack Inc. All rights reserved.</p>
+    <p>Version 2.4.0 (Enterprise Build)</p>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/icons.js"></script>
+<script>
+  document.getElementById('logoSlot').innerHTML = ICONS.logo.replace('currentColor','#2563eb');
+  document.getElementById('userIcon').innerHTML = ICONS.user;
+  document.getElementById('lockIcon').innerHTML = ICONS.lock;
+  const eyeBtn = document.getElementById('toggleEye');
+  eyeBtn.innerHTML = ICONS.eyeOff;
+  let visible = false;
+  eyeBtn.addEventListener('click', ()=>{
+    visible = !visible;
+    document.getElementById('password').type = visible ? 'text' : 'password';
+    eyeBtn.innerHTML = visible ? ICONS.eye : ICONS.eyeOff;
+  });
+
+  // If already logged in, skip straight to dashboard
+  getSession().then(s => { if(s) window.location.href = 'dashboard.html'; });
+
+  document.getElementById('forgotBtn').addEventListener('click', ()=>{
+    alert('Please contact your Administrator to reset your password.');
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    const remember = document.getElementById('remember').checked;
+    const errorBox = document.getElementById('errorBox');
+    try{
+      await attemptLogin(username, password, 'staff', remember);
+      window.location.href = 'dashboard.html';
+    }catch(err){
+      errorBox.textContent = err.message;
+      errorBox.style.display = 'block';
+    }
+  });
+</script>
+</body>
+</html>

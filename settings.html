@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StockTrack — Settings</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="work-area">
+      <div class="card" style="max-width:560px;">
+        <p class="panel-title" style="margin-bottom:16px;">My Account</p>
+        <form id="nameForm">
+          <div class="field-row">
+            <div class="field"><label for="accName">Name</label><input type="text" id="accName" required /></div>
+            <div class="field"><label>Username</label><input type="text" id="accUsername" disabled /></div>
+          </div>
+          <div class="field" style="margin-top:14px;">
+            <label>Role</label>
+            <input type="text" id="accRole" disabled />
+          </div>
+          <button type="submit" class="btn btn-blue" style="margin-top:20px;">Update Name</button>
+        </form>
+      </div>
+
+      <div class="card" style="max-width:560px;">
+        <p class="panel-title" style="margin-bottom:8px;">Change My Password</p>
+        <p class="panel-subtitle" style="margin-bottom:16px;">Update the password used to sign in to your own account.</p>
+        <form id="pwdForm">
+          <div class="field" style="margin-bottom:14px;">
+            <label>Current Password</label>
+            <input type="password" id="curPwd" required />
+          </div>
+          <div class="field" style="margin-bottom:20px;">
+            <label>New Password</label>
+            <input type="password" id="newPwd" required minlength="4" />
+          </div>
+          <button type="submit" class="btn btn-blue">Update Password</button>
+        </form>
+      </div>
+
+      <div class="card" style="max-width:560px;">
+        <p class="panel-title" style="margin-bottom:8px;">Demo Data</p>
+        <p class="panel-subtitle" style="margin-bottom:16px;">This prototype stores all data in your browser's local storage. Use this to restore the original demo dataset.</p>
+        <button class="btn btn-ghost" id="resetDataBtn">Reset Demo Data</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/layout.js"></script>
+<script>
+(async function(){
+  const session = await requireAuth(['administrator'], 'staff-login.html');
+  if(!session) return;
+  renderLayout({ session, activeKey:'settings', pageTitle:'Settings' });
+
+  document.getElementById('accName').value = session.name;
+  document.getElementById('accUsername').value = session.username;
+  document.getElementById('accRole').value = ROLE_LABELS[session.role];
+
+  document.getElementById('nameForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    try{
+      const updated = await updateUserName(session.userId, document.getElementById('accName').value);
+      session.name = updated.name;
+      document.querySelector('.avatar').textContent = initials(updated.name);
+      document.querySelector('.profile-meta p').textContent = updated.name;
+      showToast('Account name updated', 'success');
+    }catch(err){
+      showToast(err.message, 'error');
+    }
+  });
+
+  document.getElementById('pwdForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    try{
+      await changeMyPassword(document.getElementById('curPwd').value, document.getElementById('newPwd').value);
+      document.getElementById('pwdForm').reset();
+      showToast('Password updated', 'success');
+    }catch(err){
+      showToast(err.message, 'error');
+    }
+  });
+
+  document.getElementById('resetDataBtn').addEventListener('click', async ()=>{
+    if(!confirm('This will erase all products, users (except demo accounts), and transactions, restoring the original demo data. Continue?')) return;
+    try{
+      await resetDB();
+      showToast('Demo data restored', 'success');
+    }catch(err){ showToast(err.message, 'error'); }
+  });
+})();
+</script>
+</body>
+</html>
