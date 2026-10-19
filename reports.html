@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StockTrack — Reports</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="work-area">
+      <div class="card">
+        <p class="panel-title" style="margin-bottom:16px;">Inventory Overview</p>
+        <div class="stat-grid" id="statGrid"></div>
+      </div>
+
+      <div class="panel-row">
+        <section class="panel">
+          <p class="panel-title" style="margin-bottom:16px;">Stock by Category</p>
+          <table>
+            <thead><tr><th>Category</th><th class="text-right">Products</th><th class="text-right">Total Units</th></tr></thead>
+            <tbody id="categoryBody"></tbody>
+          </table>
+        </section>
+        <section class="panel">
+          <p class="panel-title" style="margin-bottom:16px;">Movement Summary (last 30 days)</p>
+          <table>
+            <thead><tr><th>Metric</th><th class="text-right">Value</th></tr></thead>
+            <tbody id="movementBody"></tbody>
+          </table>
+        </section>
+      </div>
+
+      <div class="card">
+        <p class="panel-title" style="margin-bottom:16px;">Highest Value Inventory</p>
+        <table>
+          <thead><tr><th>Product</th><th>Category</th><th class="text-right">Stock</th><th class="text-right">Unit Price</th><th class="text-right">Total Value</th></tr></thead>
+          <tbody id="valueBody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/layout.js"></script>
+<script>
+(async function(){
+  const session = await requireAuth(['administrator','staff'], 'staff-login.html');
+  if(!session) return;
+  renderLayout({ session, activeKey:'reports', pageTitle:'Reports' });
+
+  try{
+    const [products, txs, kpis] = await Promise.all([listProducts(), listTransactions(), computeKPIs()]);
+    const totalValue = products.reduce((s,p)=> s + p.stock * p.price, 0);
+    const stockedIn = txs.filter(t=>t.type==='IN').reduce((s,t)=>s+t.qty,0);
+    const stockedOut = txs.filter(t=>t.type==='OUT').reduce((s,t)=>s+t.qty,0);
+
+    document.getElementById('statGrid').innerHTML = `
+      <div class="stat-box"><div class="label">Total Inventory Value</div><div class="value">${money(totalValue)}</div></div>
+      <div class="stat-box"><div class="label">Total Units on Hand</div><div class="value">${kpis.totalStock.toLocaleString()}</div></div>
+      <div class="stat-box"><div class="label">Low / Out of Stock</div><div class="value">${kpis.lowStock} / ${kpis.outOfStock}</div></div>
+      <div class="stat-box"><div class="label">Active Categories</div><div class="value">${kpis.categories}</div></div>
+    `;
+
+    const catMap = {};
+    products.forEach(p=>{
+      catMap[p.category] = catMap[p.category] || { count:0, units:0 };
+      catMap[p.category].count++;
+      catMap[p.category].units += p.stock;
+    });
+    document.getElementById('categoryBody').innerHTML = Object.entries(catMap).map(([cat,v])=>`
+      <tr><td>${esc(cat)}</td><td class="text-right mono">${v.count}</td><td class="text-right mono">${v.units}</td></tr>
+    `).join('');
+
+    document.getElementById('movementBody').innerHTML = `
+      <tr><td>Units received (Stock In)</td><td class="text-right qty-pos">+${stockedIn}</td></tr>
+      <tr><td>Units removed (Stock Out)</td><td class="text-right qty-neg">-${stockedOut}</td></tr>
+      <tr><td>Net change</td><td class="text-right mono" style="font-weight:700;">${stockedIn - stockedOut >= 0 ? '+' : ''}${stockedIn - stockedOut}</td></tr>
+      <tr><td>Total transactions logged</td><td class="text-right mono">${txs.length}</td></tr>
+    `;
+
+    const topValue = products.map(p=>({...p, total:p.stock*p.price})).sort((a,b)=>b.total-a.total).slice(0,8);
+    document.getElementById('valueBody').innerHTML = topValue.map(p=>`
+      <tr>
+        <td>${esc(p.name)}</td><td>${esc(p.category)}</td>
+        <td class="text-right mono">${p.stock}</td>
+        <td class="text-right mono">${money(p.price)}</td>
+        <td class="text-right mono" style="font-weight:700;">${money(p.total)}</td>
+      </tr>
+    `).join('');
+  }catch(err){ showToast(err.message, 'error'); }
+})();
+</script>
+</body>
+</html>

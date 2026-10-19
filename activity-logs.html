@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StockTrack — Activity Logs</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="work-area">
+      <div class="card">
+        <div class="card-header">
+          <p class="panel-title">System Activity Log</p>
+          <button class="btn btn-ghost btn-sm" id="clearBtn">Clear Log</button>
+        </div>
+        <table>
+          <thead><tr><th>Date/Time</th><th>Actor</th><th>Event</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/layout.js"></script>
+<script>
+(async function(){
+  const session = await requireAuth(['administrator'], 'staff-login.html');
+  if(!session) return;
+  renderLayout({ session, activeKey:'activity', pageTitle:'Activity Logs' });
+
+  async function render(){
+    try{
+      const logs = await listActivity();
+      document.getElementById('logBody').innerHTML = logs.length ? logs.map(l=>`<tr>
+        <td class="mono" style="font-size:12px;">${new Date(l.at).toLocaleString()}</td>
+        <td>${esc(l.actor)}</td>
+        <td>${esc(l.message)}</td>
+      </tr>`).join('') : `<tr><td colspan="3" class="empty-state">No activity recorded.</td></tr>`;
+    }catch(err){ showToast(err.message, 'error'); }
+  }
+  await render();
+
+  document.getElementById('clearBtn').addEventListener('click', async ()=>{
+    if(!confirm('Clear the entire activity log?')) return;
+    try{
+      await clearActivity();
+      await render();
+      showToast('Activity log cleared', 'success');
+    }catch(err){ showToast(err.message, 'error'); }
+  });
+})();
+</script>
+</body>
+</html>

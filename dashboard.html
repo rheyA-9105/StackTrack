@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StockTrack — Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="work-area">
+      <div id="roleBanner"></div>
+
+      <div class="kpi-row" id="kpiRow"></div>
+
+      <div class="panel-row">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-title">Low Stock Alerts</p>
+              <p class="panel-subtitle">Items below minimum recommended threshold levels.</p>
+            </div>
+            <a class="btn-outline" href="products.html?filter=low">View All</a>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th><th>Category</th><th class="text-right">Current</th><th class="text-right">Minimum</th><th class="text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody id="lowStockBody"></tbody>
+          </table>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-title">Recent Transactions</p>
+              <p class="panel-subtitle">Log of stock adjustments made recently.</p>
+            </div>
+            <a class="btn-outline" href="inventory-history.html" id="viewLogsLink">View Logs</a>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Date/Time</th><th>Product</th><th class="text-center">Type</th><th class="text-right">Quantity</th><th>User</th>
+              </tr>
+            </thead>
+            <tbody id="txBody"></tbody>
+          </table>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/layout.js"></script>
+<script>
+(async function(){
+  const session = await requireAuth(['administrator','staff'], 'index.html');
+  if(!session) return;
+  renderLayout({ session, activeKey:'dashboard', pageTitle:'Dashboard' });
+
+  try{
+    const [kpis, low, allTx] = await Promise.all([computeKPIs(), getLowStockProducts(5), listTransactions()]);
+
+    const kpiDefs = [
+      { label:'Total Products', value:kpis.totalProducts, icon:'box', tone:'primary', trend:'+12%', dir:'up' },
+      { label:'Total Stock', value:kpis.totalStock.toLocaleString(), icon:'database', tone:'success', trend:'+4.5%', dir:'up' },
+      { label:'Low Stock Items', value:kpis.lowStock, icon:'alertTriangle', tone:'warning', trend:`${kpis.lowStock} items`, dir:'down' },
+      { label:'Out of Stock Items', value:kpis.outOfStock, icon:'xCircle', tone:'danger', trend:`${kpis.outOfStock} items`, dir:'up' },
+      { label:'Total Categories', value:kpis.categories, icon:'folder', tone:'primary', trend:'stable', dir:'up' },
+      { label:'Total Suppliers', value:kpis.suppliers, icon:'truck', tone:'success', trend:'stable', dir:'up' },
+    ];
+    document.getElementById('kpiRow').innerHTML = kpiDefs.map(k => `
+      <div class="kpi-card">
+        <div class="kpi-head">
+          <p class="kpi-label">${k.label}</p>
+          <div class="kpi-icon" style="background:var(--${k.tone}-bg); color:var(--${k.tone});">${ICONS[k.icon]}</div>
+        </div>
+        <div>
+          <p class="kpi-value">${k.value}</p>
+          <div class="kpi-trend">
+            <span class="${k.dir==='up' ? 'trend-up':'trend-down'}" style="display:flex; align-items:center; gap:2px;">
+              ${k.dir==='up' ? ICONS.arrowUpRight : ICONS.arrowDownRight} ${k.trend}
+            </span>
+            <span class="trend-duration">this month</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    document.getElementById('lowStockBody').innerHTML = low.length ? low.map(p => `
+      <tr>
+        <td>${esc(p.name)}</td>
+        <td>${esc(p.category)}</td>
+        <td class="text-right mono" style="font-weight:700; color:${p.stock===0?'var(--danger)':'var(--badge-warn-text)'}">${p.stock}</td>
+        <td class="text-right mono">${p.minStock}</td>
+        <td class="text-center"><span class="badge ${p.stock===0?'badge-out':'badge-low'}">${p.stock===0?'Out of Stock':'Low Stock'}</span></td>
+      </tr>
+    `).join('') : `<tr><td colspan="5" class="empty-state">All products are well stocked.</td></tr>`;
+
+    const txs = allTx.slice(0, 5);
+    document.getElementById('txBody').innerHTML = txs.length ? txs.map(t => `
+      <tr>
+        <td class="mono" style="font-size:12px;">${formatTimeAgo(t.at)}</td>
+        <td>${esc(t.productName || '—')}</td>
+        <td class="text-center"><span class="badge ${t.type==='IN'?'badge-in':'badge-outtx'}">${t.type==='IN'?'STOCK IN':'STOCK OUT'}</span></td>
+        <td class="text-right ${t.type==='IN'?'qty-pos':'qty-neg'}">${t.type==='IN'?'+':'-'}${t.qty}</td>
+        <td>${esc(t.userName || 'Unknown')}</td>
+      </tr>
+    `).join('') : `<tr><td colspan="5" class="empty-state">No transactions yet.</td></tr>`;
+  }catch(err){
+    showToast(err.message, 'error');
+  }
+})();
+</script>
+</body>
+</html>
