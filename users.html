@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StockTrack — Users</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="work-area">
+      <div class="perm-note">Only Administrators can create new Staff accounts and reset passwords. Administrator accounts cannot be created here or removed, for security.</div>
+
+      <div class="card">
+        <div class="card-header">
+          <p class="panel-title">User Accounts</p>
+          <button class="btn btn-blue" id="addUserBtn"><span id="plusIcon"></span> Add Staff</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Username</th><th>Role</th><th>Created</th><th class="text-right">Actions</th></tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <h3>Add Staff Account</h3>
+    <form id="userForm">
+      <div class="field" style="margin-bottom:14px;">
+        <label>Full Name</label>
+        <input type="text" id="fName" required />
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Username</label>
+        <input type="text" id="fUsername" required />
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Temporary Password</label>
+        <input type="text" id="fPassword" required value="" />
+      </div>
+      <div class="field" style="margin-bottom:6px;">
+        <label>Role</label>
+        <select id="fRole">
+          <option value="staff">Staff</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelUserModal">Cancel</button>
+        <button type="submit" class="btn btn-blue">Create Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="resetModal">
+  <div class="modal">
+    <h3>Reset Password</h3>
+    <p class="panel-subtitle" id="resetForName" style="margin-bottom:16px;"></p>
+    <div class="field" style="margin-bottom:20px;">
+      <label>New Password</label>
+      <input type="text" id="newPasswordInput" />
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="cancelResetModal">Cancel</button>
+      <button type="button" class="btn btn-blue" id="confirmResetBtn">Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/layout.js"></script>
+<script>
+(async function(){
+  const session = await requireAuth(['administrator'], 'staff-login.html');
+  if(!session) return;
+  renderLayout({ session, activeKey:'users', pageTitle:'Users' });
+  document.getElementById('plusIcon').innerHTML = ICONS.plus;
+
+  let users = [];
+
+  function roleBadge(role){
+    const cls = role === 'administrator' ? 'badge-role-admin' : 'badge-role-staff';
+    return `<span class="badge ${cls}">${ROLE_LABELS[role]}</span>`;
+  }
+
+  async function render(){
+    try{ users = await listUsers(); }
+    catch(err){ showToast(err.message, 'error'); return; }
+    document.getElementById('usersBody').innerHTML = users.map(u => {
+      let actions = '';
+      if(u.role !== 'administrator'){
+        actions = `
+          <button class="btn btn-ghost btn-sm" onclick="openReset('${u.id}')">${ICONS.key} Reset</button>
+          <button class="btn btn-red btn-sm" onclick="handleRemove('${u.id}')">${ICONS.trash}</button>
+        `;
+      } else {
+        actions = `<span style="font-size:12px; color:var(--text-light);">Protected</span>`;
+      }
+      return `
+        <tr>
+          <td style="display:flex; align-items:center; gap:10px;">
+            <div class="avatar" style="width:28px; height:28px; font-size:11px;">${esc(initials(u.name))}</div>
+            ${esc(u.name)}
+          </td>
+          <td class="mono">${esc(u.username)}</td>
+          <td>${roleBadge(u.role)}</td>
+          <td style="font-size:12px; color:var(--text-mid);">${new Date(u.createdAt).toLocaleDateString()}</td>
+          <td class="text-right"><div style="display:flex; gap:6px; justify-content:flex-end;">${actions}</div></td>
+        </tr>
+      `;
+    }).join('');
+  }
+  await render();
+
+  // Add user modal
+  const userModal = document.getElementById('userModal');
+  document.getElementById('addUserBtn').addEventListener('click', ()=>{
+    document.getElementById('userForm').reset();
+    document.getElementById('fPassword').value = 'Welcome' + Math.floor(1000+Math.random()*9000);
+    userModal.classList.add('open');
+  });
+  document.getElementById('cancelUserModal').addEventListener('click', ()=> userModal.classList.remove('open'));
+  document.getElementById('userForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    try{
+      await addStaffAccount({
+        name: document.getElementById('fName').value.trim(),
+        username: document.getElementById('fUsername').value.trim(),
+        password: document.getElementById('fPassword').value,
+        role: document.getElementById('fRole').value,
+      });
+      userModal.classList.remove('open');
+      await render();
+      showToast('Account created', 'success');
+    }catch(err){
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Reset password modal
+  const resetModal = document.getElementById('resetModal');
+  let resetTargetId = null;
+  window.openReset = function(id){
+    const u = users.find(x => x.id === id);
+    if(!u) return;
+    resetTargetId = id;
+    document.getElementById('resetForName').textContent = `Set a new password for ${u.name} (${u.username}).`;
+    document.getElementById('newPasswordInput').value = 'Reset' + Math.floor(1000+Math.random()*9000);
+    resetModal.classList.add('open');
+  };
+  document.getElementById('cancelResetModal').addEventListener('click', ()=> resetModal.classList.remove('open'));
+  document.getElementById('confirmResetBtn').addEventListener('click', async ()=>{
+    const pwd = document.getElementById('newPasswordInput').value.trim();
+    if(!pwd){ showToast('Password cannot be empty', 'error'); return; }
+    try{
+      await resetUserPassword(resetTargetId, pwd);
+      resetModal.classList.remove('open');
+      showToast('Password reset. Share the new password with the user securely.', 'success');
+    }catch(err){ showToast(err.message, 'error'); }
+  });
+
+  window.handleRemove = async function(id){
+    const u = users.find(x => x.id === id);
+    if(!u) return;
+    if(!confirm(`Remove ${u.name} (${u.username})? They will lose access immediately.`)) return;
+    try{
+      await removeUser(id);
+      await render();
+      showToast('User removed', 'success');
+    }catch(err){ showToast(err.message, 'error'); }
+  };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StockTrack — Products</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="work-area">
+      <div id="roleBanner"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <p class="panel-title" id="productsSectionTitle">Product Categories</p>
+            <p class="panel-subtitle" id="productsSectionSubtitle">Choose a category to view its products.</p>
+          </div>
+          <div class="toolbar" id="productToolbar" style="display:none; flex:1; justify-content:flex-end;">
+            <div class="search-box" style="width:320px;">
+              <span id="searchIcon"></span>
+              <input type="text" id="searchInput" placeholder="Search by name, category or supplier..." />
+            </div>
+            <select id="filterSelect" class="field" style="max-width:180px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:13px;">
+              <option value="all">All Products</option>
+              <option value="low">Low Stock</option>
+              <option value="out">Out of Stock</option>
+            </select>
+          </div>
+          <div class="product-header-actions">
+            <button class="btn btn-ghost" id="addCategoryBtn" style="display:none;"><span id="categoryIcon"></span> Add Category</button>
+          </div>
+        </div>
+        <div id="categoryView" class="category-grid"></div>
+        <div id="productsView" style="display:none;">
+          <div class="category-products-toolbar">
+            <button class="btn btn-ghost btn-sm category-back" id="backToCategories"><span id="backIcon"></span> Back to Categories</button>
+            <button class="btn btn-blue" id="addProductBtn" style="display:none;"><span id="plusIcon"></span> Add Product</button>
+          </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th><th>Category</th><th>Supplier</th><th class="text-right">Stock</th><th class="text-right">Min</th>
+              <th class="text-right">Price</th><th class="text-center">Status</th><th class="text-right" id="actionsHead">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="productsBody"></tbody>
+        </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay" id="productModal">
+  <div class="modal">
+    <h3 id="modalTitle">Add Product</h3>
+    <form id="productForm">
+      <input type="hidden" id="productId" />
+      <div class="field" style="margin-bottom:14px;">
+        <label>Product Name</label>
+        <input type="text" id="fName" required />
+      </div>
+      <div class="field-row" style="margin-bottom:14px;">
+        <div class="field"><label for="fCategory">Category</label><select id="fCategory" required></select></div>
+        <div class="field"><label>Supplier</label><input type="text" id="fSupplier" required /></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Current Stock</label><input type="number" id="fStock" min="0" required /></div>
+        <div class="field"><label>Minimum Stock</label><input type="number" id="fMinStock" min="0" required /></div>
+        <div class="field"><label>Unit Price ($)</label><input type="number" id="fPrice" min="0" step="0.01" required /></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelModal">Cancel</button>
+        <button type="submit" class="btn btn-blue">Save Product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="categoryModal">
+  <div class="modal category-modal">
+    <h3 id="categoryModalTitle">Add Category</h3>
+    <p class="panel-subtitle category-modal-subtitle">Create a folder for organizing your products.</p>
+    <form id="categoryForm">
+      <input type="hidden" id="categoryOriginalName" />
+      <div class="field">
+        <label for="categoryName">Category Name</label>
+        <input type="text" id="categoryName" placeholder="e.g. Electronics" required />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelCategory">Cancel</button>
+        <button type="submit" class="btn btn-blue">Add Category</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="categoryDeleteModal" role="dialog" aria-modal="true" aria-labelledby="categoryDeleteTitle">
+  <div class="modal delete-modal">
+    <h3 id="categoryDeleteTitle">Delete category?</h3>
+    <p class="delete-message">Are you sure you want to remove <strong id="deleteCategoryName"></strong>?</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="cancelCategoryDelete">Keep Category</button>
+      <button type="button" class="btn btn-red delete-confirm" id="confirmCategoryDelete"><span id="categoryTrashIcon"></span> Delete Category</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+  <div class="modal delete-modal">
+    <h3 id="deleteTitle">Delete product?</h3>
+    <p class="delete-message">Are you sure you want to remove <strong id="deleteProductName"></strong> from your inventory?</p>
+    <div class="delete-detail">
+      <span class="delete-detail-label">Current stock</span>
+      <strong id="deleteProductStock"></strong>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="cancelDelete">Keep Product</button>
+      <button type="button" class="btn btn-red delete-confirm" id="confirmDelete"><span id="trashIcon"></span> Delete Product</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/layout.js"></script>
+<script>
+(async function(){
+  const session = await requireAuth(['administrator','staff'], 'index.html');
+  if(!session) return;
+  renderLayout({ session, activeKey:'products', pageTitle:'Products' });
+  const isAdmin = session.role === 'administrator';
+  const canAdjustStock = session.role === 'administrator' || session.role === 'staff';
+
+  document.getElementById('searchIcon').innerHTML = ICONS.search;
+  document.getElementById('plusIcon').innerHTML = ICONS.plus;
+  document.getElementById('categoryIcon').innerHTML = ICONS.folder;
+  document.getElementById('backIcon').innerHTML = ICONS.chevronDown;
+  document.getElementById('trashIcon').innerHTML = ICONS.trash;
+  if(isAdmin){
+    document.getElementById('addCategoryBtn').style.display = 'inline-flex';
+    document.getElementById('addProductBtn').style.display = 'inline-flex';
+  }
+  if(!isAdmin && !canAdjustStock) document.getElementById('actionsHead').style.display = 'none';
+
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('q')) document.getElementById('searchInput').value = params.get('q');
+  if(params.get('filter')) document.getElementById('filterSelect').value = params.get('filter');
+  let selectedCategory = null;
+  const categoryView = document.getElementById('categoryView');
+  const productsView = document.getElementById('productsView');
+  const productToolbar = document.getElementById('productToolbar');
+  const productHeaderActions = document.querySelector('.product-header-actions');
+  const sectionTitle = document.getElementById('productsSectionTitle');
+  const sectionSubtitle = document.getElementById('productsSectionSubtitle');
+
+  // Local copy of server data; call refresh() after any change
+  let products = [];
+  let categories = [];
+  async function refresh(){
+    [products, categories] = await Promise.all([listProducts(), listCategories()]);
+  }
+
+  function renderCategories(){
+    categoryView.innerHTML = categories.map(category => {
+      const categoryProducts = products.filter(p => p.category === category);
+      const hasOutOfStock = categoryProducts.some(p => p.stock === 0);
+      const hasLowStock = categoryProducts.some(p => p.stock > 0 && p.stock <= p.minStock);
+      const stockStatus = hasOutOfStock ? 'out' : hasLowStock ? 'low' : '';
+      const categoryMenu = isAdmin ? `<div class="category-folder-menu">
+          <button type="button" class="category-folder-menu-trigger" aria-label="Actions for ${esc(category)}" aria-expanded="false">...</button>
+          <div class="category-folder-menu-list">
+            <button type="button" data-action="edit">Edit</button>
+            <button type="button" data-action="delete">Delete</button>
+          </div>
+        </div>` : '';
+      return `<div class="category-folder" data-category="${esc(category)}" role="button" tabindex="0">
+        <span class="category-folder-icon">${ICONS.folder}</span>
+        <span class="category-folder-copy"><strong>${esc(category)}${stockStatus ? `<span class="category-folder-stock-dot ${stockStatus}" title="${stockStatus === 'out' ? 'Out of stock' : 'Low stock'}" aria-label="${stockStatus === 'out' ? 'Out of stock' : 'Low stock'}"></span>` : ''}</strong><span>${categoryProducts.length} product${categoryProducts.length === 1 ? '' : 's'}</span></span>
+        ${categoryMenu}
+      </div>`;
+    }).join('');
+    categoryView.querySelectorAll('.category-folder').forEach(folder => {
+      folder.addEventListener('click', event => {
+        if(event.target.closest('.category-folder-menu')) return;
+        openCategory(folder.dataset.category);
+      });
+      folder.addEventListener('keydown', event => {
+        if((event.key === 'Enter' || event.key === ' ') && !event.target.closest('.category-folder-menu')){
+          event.preventDefault();
+          openCategory(folder.dataset.category);
+        }
+      });
+      const menu = folder.querySelector('.category-folder-menu');
+      if(menu){
+        const trigger = menu.querySelector('.category-folder-menu-trigger');
+        trigger.addEventListener('click', event => {
+          event.stopPropagation();
+          const isOpen = menu.classList.toggle('open');
+          trigger.setAttribute('aria-expanded', String(isOpen));
+        });
+        menu.querySelector('[data-action="edit"]').addEventListener('click', () => openCategoryEdit(folder.dataset.category));
+        menu.querySelector('[data-action="delete"]').addEventListener('click', () => openCategoryDelete(folder.dataset.category));
+      }
+    });
+  }
+  function openCategory(category){
+    selectedCategory = category;
+    categoryView.style.display = 'none';
+    productsView.style.display = 'block';
+    productToolbar.style.display = 'flex';
+    productHeaderActions.style.display = 'none';
+    document.getElementById('addProductBtn').style.display = isAdmin ? 'inline-flex' : 'none';
+    sectionTitle.textContent = category;
+    sectionSubtitle.textContent = 'Products in this category.';
+    renderTable();
+  }
+  function closeCategory(){
+    selectedCategory = null;
+    categoryView.style.display = 'grid';
+    productsView.style.display = 'none';
+    productToolbar.style.display = 'none';
+    productHeaderActions.style.display = isAdmin ? 'flex' : 'none';
+    document.getElementById('addProductBtn').style.display = 'none';
+    sectionTitle.textContent = 'Product Categories';
+    sectionSubtitle.textContent = 'Choose a category to view its products.';
+    renderCategories();
+  }
+  function populateCategoryOptions(selected){
+    document.getElementById('fCategory').innerHTML = categories.map(category =>
+      `<option value="${esc(category)}" ${category === selected ? 'selected' : ''}>${esc(category)}</option>`
+    ).join('');
+  }
+
+  function renderTable(){
+    const q = document.getElementById('searchInput').value.trim().toLowerCase();
+    const filter = document.getElementById('filterSelect').value;
+    let list = products.filter(p =>
+      !q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || p.supplier.toLowerCase().includes(q)
+    );
+    if(selectedCategory) list = list.filter(p => p.category === selectedCategory);
+    if(filter === 'low') list = list.filter(p => p.stock > 0 && p.stock <= p.minStock);
+    if(filter === 'out') list = list.filter(p => p.stock === 0);
+
+    document.getElementById('productsBody').innerHTML = list.length ? list.map(p => {
+      let statusBadge = '<span class="badge badge-ok">In Stock</span>';
+      if(p.stock === 0) statusBadge = '<span class="badge badge-out">Out of Stock</span>';
+      else if(p.stock <= p.minStock) statusBadge = '<span class="badge badge-low">Low Stock</span>';
+
+      let actions = '';
+      if(isAdmin){
+        actions += `<button class="btn btn-ghost btn-sm" onclick="openEdit('${p.id}')">${ICONS.edit}</button>
+                    <button class="btn btn-red btn-sm" onclick="removeProduct('${p.id}')">${ICONS.trash}</button>`;
+      } else if(canAdjustStock){
+        actions += `<a class="btn btn-green btn-sm" href="stock-in.html?product=${p.id}">${ICONS.stockIn}</a>
+                    <a class="btn btn-red btn-sm" href="stock-out.html?product=${p.id}">${ICONS.stockOut}</a>`;
+      }
+      return `
+        <tr>
+          <td style="font-weight:500;">${esc(p.name)}</td>
+          <td>${esc(p.category)}</td>
+          <td>${esc(p.supplier)}</td>
+          <td class="text-right mono" style="font-weight:700;">${p.stock}</td>
+          <td class="text-right mono">${p.minStock}</td>
+          <td class="text-right mono">${money(p.price)}</td>
+          <td class="text-center">${statusBadge}</td>
+          <td class="text-right"><div style="display:flex; gap:6px; justify-content:flex-end;">${actions}</div></td>
+        </tr>
+      `;
+    }).join('') : `<tr><td colspan="8" class="empty-state">No products match your search.</td></tr>`;
+  }
+
+  document.getElementById('searchInput').addEventListener('input', renderTable);
+  document.getElementById('filterSelect').addEventListener('change', renderTable);
+  document.getElementById('backToCategories').addEventListener('click', closeCategory);
+
+  try{ await refresh(); }catch(err){ showToast(err.message, 'error'); }
+  renderCategories();
+  const linkedProduct = params.get('product') ? products.find(p => p.id === params.get('product')) : null;
+  if(linkedProduct){
+    document.getElementById('searchInput').value = linkedProduct.name;
+    openCategory(linkedProduct.category);
+  }
+
+  // ---- Admin modal CRUD ----
+  const modal = document.getElementById('productModal');
+  const categoryModal = document.getElementById('categoryModal');
+  const deleteModal = document.getElementById('deleteModal');
+  const categoryDeleteModal = document.getElementById('categoryDeleteModal');
+  let pendingDeleteId = null;
+  let pendingCategoryDelete = null;
+  function openAdd(){
+    document.getElementById('modalTitle').textContent = 'Add Product';
+    document.getElementById('productForm').reset();
+    document.getElementById('productId').value = '';
+    populateCategoryOptions(selectedCategory);
+    modal.classList.add('open');
+  }
+  window.openEdit = function(id){
+    const p = products.find(x => x.id === id);
+    if(!p) return;
+    document.getElementById('modalTitle').textContent = 'Edit Product';
+    document.getElementById('productId').value = p.id;
+    document.getElementById('fName').value = p.name;
+    populateCategoryOptions(p.category);
+    document.getElementById('fSupplier').value = p.supplier;
+    document.getElementById('fStock').value = p.stock;
+    document.getElementById('fMinStock').value = p.minStock;
+    document.getElementById('fPrice').value = p.price;
+    modal.classList.add('open');
+  };
+  window.removeProduct = function(id){
+    const p = products.find(x => x.id === id);
+    if(!p) return;
+    pendingDeleteId = id;
+    document.getElementById('deleteProductName').textContent = p.name;
+    document.getElementById('deleteProductStock').textContent = `${p.stock} unit${p.stock === 1 ? '' : 's'}`;
+    deleteModal.classList.add('open');
+    document.getElementById('cancelDelete').focus();
+  };
+  window.openCategoryEdit = function(category){
+    document.getElementById('categoryModalTitle').textContent = 'Edit Category';
+    document.querySelector('.category-modal-subtitle').textContent = 'Update the name used to organize your products.';
+    document.getElementById('categoryOriginalName').value = category;
+    document.getElementById('categoryName').value = category;
+    categoryModal.classList.add('open');
+    document.getElementById('categoryName').focus();
+  };
+  window.openCategoryDelete = function(category){
+    pendingCategoryDelete = category;
+    document.getElementById('deleteCategoryName').textContent = category;
+    categoryDeleteModal.classList.add('open');
+    document.getElementById('cancelCategoryDelete').focus();
+  };
+  if(isAdmin) document.getElementById('addProductBtn').addEventListener('click', openAdd);
+  if(isAdmin) document.getElementById('addCategoryBtn').addEventListener('click', ()=>{
+    document.getElementById('categoryModalTitle').textContent = 'Add Category';
+    document.querySelector('.category-modal-subtitle').textContent = 'Create a folder for organizing your products.';
+    document.getElementById('categoryForm').reset();
+    document.getElementById('categoryOriginalName').value = '';
+    categoryModal.classList.add('open');
+    document.getElementById('categoryName').focus();
+  });
+  document.getElementById('cancelModal').addEventListener('click', ()=> modal.classList.remove('open'));
+  document.getElementById('cancelCategory').addEventListener('click', ()=> categoryModal.classList.remove('open'));
+  document.getElementById('categoryForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    try{
+      const originalName = document.getElementById('categoryOriginalName').value;
+      const categoryName = document.getElementById('categoryName').value;
+      if(originalName) await updateCategory(originalName, categoryName);
+      else await addCategory(categoryName);
+      categoryModal.classList.remove('open');
+      await refresh();
+      renderCategories();
+      showToast(originalName ? 'Category updated' : 'Category added', 'success');
+    }catch(err){
+      showToast(err.message, 'error');
+    }
+  });
+  document.getElementById('cancelDelete').addEventListener('click', ()=>{
+    pendingDeleteId = null;
+    deleteModal.classList.remove('open');
+  });
+  document.getElementById('cancelCategoryDelete').addEventListener('click', ()=>{
+    pendingCategoryDelete = null;
+    categoryDeleteModal.classList.remove('open');
+  });
+  document.getElementById('confirmCategoryDelete').addEventListener('click', async ()=>{
+    if(!pendingCategoryDelete) return;
+    try{
+      const movedProducts = await deleteCategory(pendingCategoryDelete);
+      pendingCategoryDelete = null;
+      categoryDeleteModal.classList.remove('open');
+      await refresh();
+      renderCategories();
+      showToast(movedProducts ? `Category deleted; ${movedProducts} product${movedProducts === 1 ? '' : 's'} moved to Uncategorized` : 'Category deleted', 'success');
+    }catch(err){
+      showToast(err.message, 'error');
+    }
+  });
+  document.getElementById('confirmDelete').addEventListener('click', async ()=>{
+    if(!pendingDeleteId) return;
+    try{
+      await deleteProduct(pendingDeleteId);
+      pendingDeleteId = null;
+      deleteModal.classList.remove('open');
+      await refresh();
+      renderTable();
+      if(!selectedCategory) renderCategories();
+      showToast('Product deleted', 'success');
+    }catch(err){
+      showToast(err.message, 'error');
+    }
+  });
+  document.getElementById('productForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const id = document.getElementById('productId').value;
+    const data = {
+      name: document.getElementById('fName').value.trim(),
+      category: document.getElementById('fCategory').value.trim(),
+      supplier: document.getElementById('fSupplier').value.trim(),
+      stock: Number(document.getElementById('fStock').value),
+      minStock: Number(document.getElementById('fMinStock').value),
+      price: Number(document.getElementById('fPrice').value),
+    };
+    try{
+      if(id){ await updateProduct(id, data); showToast('Product updated', 'success'); }
+      else { await addProduct(data); showToast('Product added', 'success'); }
+      modal.classList.remove('open');
+      await refresh();
+      renderTable();
+      if(!selectedCategory) renderCategories();
+    }catch(err){
+      showToast(err.message, 'error');
+    }
+  });
+})();
+</script>
+</body>
+</html>

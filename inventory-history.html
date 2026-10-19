@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StockTrack — Inventory History</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="work-area">
+      <div class="card">
+        <div class="card-header">
+          <p class="panel-title">Full Transaction History</p>
+          <div class="toolbar">
+            <select id="typeFilter" class="field" style="padding:8px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:13px;">
+              <option value="all">All Types</option>
+              <option value="IN">Stock In</option>
+              <option value="OUT">Stock Out</option>
+            </select>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Date/Time</th><th>Product</th><th class="text-center">Type</th><th class="text-right">Quantity</th><th>User</th><th>Note</th></tr>
+          </thead>
+          <tbody id="txBody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/layout.js"></script>
+<script>
+(async function(){
+  const session = await requireAuth(['administrator','staff'], 'staff-login.html');
+  if(!session) return;
+  renderLayout({ session, activeKey:'history', pageTitle:'Inventory History' });
+
+  async function render(){
+    try{
+      const txs = await listTransactions(document.getElementById('typeFilter').value);
+      document.getElementById('txBody').innerHTML = txs.length ? txs.map(t => `<tr>
+        <td class="mono" style="font-size:12px;">${new Date(t.at).toLocaleString()}</td>
+        <td>${t.productName ? esc(t.productName) : '(deleted product)'}</td>
+        <td class="text-center"><span class="badge ${t.type==='IN'?'badge-in':'badge-outtx'}">${t.type==='IN'?'STOCK IN':'STOCK OUT'}</span></td>
+        <td class="text-right ${t.type==='IN'?'qty-pos':'qty-neg'}">${t.type==='IN'?'+':'-'}${t.qty}</td>
+        <td>${esc(t.userName || 'Unknown')}</td>
+        <td style="color:var(--text-mid);">${esc(t.note) || '—'}</td>
+      </tr>`).join('') : `<tr><td colspan="6" class="empty-state">No transactions recorded.</td></tr>`;
+    }catch(err){ showToast(err.message, 'error'); }
+  }
+  document.getElementById('typeFilter').addEventListener('change', render);
+  await render();
+})();
+</script>
+</body>
+</html>

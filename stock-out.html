@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>StockTrack — Stock Out</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="work-area">
+      <div class="card" style="max-width:560px;">
+        <div class="card-header"><p class="panel-title">Remove Stock</p></div>
+        <p class="panel-subtitle" style="margin-bottom:20px;">Record inventory leaving (sales, usage, or damage).</p>
+        <form id="stockForm">
+          <div class="field" style="margin-bottom:16px;">
+            <label>Product</label>
+            <select id="fProduct" required></select>
+          </div>
+          <div class="field" style="margin-bottom:16px;">
+            <label>Quantity Removed</label>
+            <input type="number" id="fQty" min="1" required />
+          </div>
+          <div class="field" style="margin-bottom:20px;">
+            <label>Reason (optional)</label>
+            <input type="text" id="fNote" placeholder="e.g. Issued to Room 204" />
+          </div>
+          <div id="currentStockInfo" class="perm-note"></div>
+          <button type="submit" class="btn btn-red" style="width:100%; justify-content:center; padding:12px;">
+            <span id="submitIcon"></span> Confirm Stock Out
+          </button>
+        </form>
+      </div>
+
+      <div class="card" style="max-width:560px;">
+        <p class="panel-title" style="margin-bottom:16px;">Recent Stock Out Entries</p>
+        <table>
+          <thead><tr><th>Date/Time</th><th>Product</th><th class="text-right">Qty</th><th>By</th></tr></thead>
+          <tbody id="recentBody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/layout.js"></script>
+<script>
+(async function(){
+  const session = await requireAuth(['administrator','staff'], 'staff-login.html');
+  if(!session) return;
+  renderLayout({ session, activeKey:'stockout', pageTitle:'Stock Out' });
+  document.getElementById('submitIcon').innerHTML = ICONS.stockOut;
+
+  const params = new URLSearchParams(window.location.search);
+  const preselect = params.get('product');
+  let products = [];
+
+  async function populateProducts(){
+    products = await listProducts();
+    const current = document.getElementById('fProduct').value || preselect;
+    document.getElementById('fProduct').innerHTML = products.map(p =>
+      `<option value="${esc(p.id)}" ${p.id===current?'selected':''}>${esc(p.name)} (current: ${p.stock})</option>`
+    ).join('');
+    updateInfo();
+  }
+  function updateInfo(){
+    const p = products.find(x => x.id === document.getElementById('fProduct').value);
+    if(p) document.getElementById('currentStockInfo').textContent = `Current stock: ${p.stock} · Minimum threshold: ${p.minStock}`;
+  }
+  document.getElementById('fProduct').addEventListener('change', updateInfo);
+
+  async function renderRecent(){
+    const rows = (await listTransactions('')).slice(0, 8);
+    document.getElementById('recentBody').innerHTML = rows.length ? rows.map(t => `<tr>
+      <td class="mono" style="font-size:12px;">${formatTimeAgo(t.at)}</td>
+      <td>${esc(t.productName || '—')}</td>
+      <td class="text-right qty-neg">-${t.qty}</td>
+      <td>${esc(t.userName || '—')}</td>
+    </tr>`).join('') : `<tr><td colspan="4" class="empty-state">No stock-out entries yet.</td></tr>`;
+  }
+
+  try{ await populateProducts(); await renderRecent(); }
+  catch(err){ showToast(err.message, 'error'); }
+
+  document.getElementById('stockForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const productId = document.getElementById('fProduct').value;
+    const qty = document.getElementById('fQty').value;
+    const note = document.getElementById('fNote').value;
+    try{
+      await addTransaction({ productId, type:'', qty, note });
+      showToast('Stock removed successfully', 'success');
+      document.getElementById('fQty').value = '';
+      document.getElementById('fNote').value = '';
+      await populateProducts();
+      await renderRecent();
+    }catch(err){
+      showToast(err.message, 'error');
+    }
+  });
+})();
+</script>
+</body>
+</html>
